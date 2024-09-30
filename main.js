@@ -8,11 +8,17 @@ class GameScene extends Phaser.Scene {
     this.playerPoints = 0; // Pontos do jogador
     this.computerPoints = 0; // Pontos do computador
     this.roundPoints = 1; // Quantos pontos a rodada vale
+    this.currentRound = 0; // Rodada atual (máx. 3 por mão)
+    this.playerRoundWins = 0; // Quantas rodadas o jogador venceu
+    this.computerRoundWins = 0; // Quantas rodadas o computador venceu
+    this.playerCardsPlayed = []; // Cartas jogadas pelo jogador
+    this.computerCardsPlayed = []; // Cartas jogadas pelo computador
   }
 
   preload() {
+    // Carregar imagens
     this.load.image("background", "assets/background.jpg");
-    this.load.image("card_back", "assets/card_back.jpg"); // Imagem da carta virada
+    this.load.image("card_back", "assets/card_back.jpg");
     for (let i = 1; i <= 10; i++) {
       this.load.image(`paus_${i}`, `assets/${i}_of_paus.jpg`);
       this.load.image(`copas_${i}`, `assets/${i}_of_copas.jpg`);
@@ -105,55 +111,106 @@ class GameScene extends Phaser.Scene {
     cardSprite.x = 400;
     cardSprite.y = 300;
     this.playerHand = this.playerHand.filter((c) => c !== card); // Remove a carta jogada da mão do jogador
+    this.playerCardsPlayed.push(card); // Armazena a carta jogada
 
     // Após o jogador jogar, o computador joga
     setTimeout(() => {
-      scene.computerPlay(scene);
+      scene.computerPlay(scene, card);
     }, 1000); // Adiciona um pequeno atraso para o turno do computador
   }
 
-  computerPlay(scene) {
+  computerPlay(scene, playerCard) {
     if (this.opponentHand.length > 0) {
-      let card = this.opponentHand.pop(); // O computador joga sua última carta
-      let cardSprite = scene.add.image(400, 100, card.image); // Exibe a carta jogada pelo computador
-      this.compareCards(this.playerHand.pop(), card); // Compara as cartas jogadas
+      let computerCard = this.opponentHand.pop(); // O computador joga sua última carta
+      let cardSprite = scene.add.image(400, 100, computerCard.image); // Exibe a carta jogada pelo computador
+      this.computerCardsPlayed.push(computerCard); // Armazena a carta jogada
+      this.compareCards(playerCard, computerCard); // Compara as cartas jogadas
     }
   }
 
   compareCards(playerCard, computerCard) {
     let winner;
+
+    // Verifica se a carta jogada é manilha
     if (this.isManilha(playerCard) && !this.isManilha(computerCard)) {
       winner = "Jogador";
+      this.playerRoundWins++;
     } else if (!this.isManilha(playerCard) && this.isManilha(computerCard)) {
       winner = "Computador";
+      this.computerRoundWins++;
     } else if (playerCard.value > computerCard.value) {
       winner = "Jogador";
+      this.playerRoundWins++;
     } else if (playerCard.value < computerCard.value) {
       winner = "Computador";
+      this.computerRoundWins++;
     } else {
       winner = "Empate"; // Caso as cartas sejam iguais
     }
 
-    // Exibir o vencedor da rodada
-    setTimeout(() => {
-      alert(winner + " venceu a rodada!");
-      if (winner === "Jogador") {
-        this.playerPoints += this.roundPoints;
-        this.updateScore();
-      } else if (winner === "Computador") {
-        this.computerPoints += this.roundPoints;
-        this.updateScore();
-      }
-    }, 500);
+    // Incrementa a rodada
+    this.currentRound++;
+
+    // Checa se já jogaram as três rodadas
+    if (this.currentRound === 3) {
+      this.determineMatchWinner();
+    }
   }
 
   isManilha(card) {
-    return card.value === this.manilha;
+    return card && card.value === this.manilha;
+  }
+
+  determineMatchWinner() {
+    let winner;
+
+    if (this.playerRoundWins > this.computerRoundWins) {
+      winner = "Jogador";
+      this.playerPoints++;
+    } else if (this.computerRoundWins > this.playerRoundWins) {
+      winner = "Computador";
+      this.computerPoints++;
+    } else {
+      winner = "Empate";
+      // Em caso de empate nas três rodadas, ganha quem venceu a primeira rodada (se houve um vencedor)
+      if (this.playerRoundWins > 0) {
+        winner = "Jogador";
+        this.playerPoints++;
+      } else if (this.computerRoundWins > 0) {
+        winner = "Computador";
+        this.computerPoints++;
+      }
+    }
+
+    this.updateScore();
+
+    if (this.playerPoints >= 12 || this.computerPoints >= 12) {
+      this.endGame(winner);
+    } else {
+      this.resetRound();
+    }
   }
 
   updateScore() {
     this.playerScoreText.setText("Jogador: " + this.playerPoints);
     this.computerScoreText.setText("Computador: " + this.computerPoints);
+  }
+
+  resetRound() {
+    this.currentRound = 0;
+    this.playerRoundWins = 0;
+    this.computerRoundWins = 0;
+    this.playerCardsPlayed = [];
+    this.computerCardsPlayed = [];
+    this.createDeck();
+    this.distributeCards();
+    this.displayPlayerHand(this);
+    this.displayOpponentHand(this);
+  }
+
+  endGame(winner) {
+    alert(winner + " venceu o jogo!");
+    this.scene.restart(); // Reinicia o jogo
   }
 }
 
