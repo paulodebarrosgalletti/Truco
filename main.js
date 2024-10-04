@@ -13,6 +13,8 @@ class GameScene extends Phaser.Scene {
     this.computerRoundWins = 0; // Quantas rodadas o computador venceu
     this.playerCardsPlayed = []; // Cartas jogadas pelo jogador
     this.computerCardsPlayed = []; // Cartas jogadas pelo computador
+    this.forceOrder = ["4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"]; // Ordem de força das cartas
+    this.suitOrder = ["ouros", "espadas", "copas", "paus"]; // Hierarquia dos naipes
   }
 
   preload() {
@@ -130,23 +132,33 @@ class GameScene extends Phaser.Scene {
 
   compareCards(playerCard, computerCard) {
     let winner;
+    let playerCardValue = this.forceOrder.indexOf(playerCard.value);
+    let computerCardValue = this.forceOrder.indexOf(computerCard.value);
 
-    // Verifica se a carta jogada é manilha
-    if (this.isManilha(playerCard) && !this.isManilha(computerCard)) {
+    if (playerCardValue > computerCardValue) {
       winner = "Jogador";
       this.playerRoundWins++;
-    } else if (!this.isManilha(playerCard) && this.isManilha(computerCard)) {
-      winner = "Computador";
-      this.computerRoundWins++;
-    } else if (playerCard.value > computerCard.value) {
-      winner = "Jogador";
-      this.playerRoundWins++;
-    } else if (playerCard.value < computerCard.value) {
+    } else if (playerCardValue < computerCardValue) {
       winner = "Computador";
       this.computerRoundWins++;
     } else {
-      winner = "Empate"; // Caso as cartas sejam iguais
+      // Desempate com base no naipe
+      let playerSuitValue = this.suitOrder.indexOf(playerCard.suit);
+      let computerSuitValue = this.suitOrder.indexOf(computerCard.suit);
+      if (playerSuitValue > computerSuitValue) {
+        winner = "Jogador";
+        this.playerRoundWins++;
+      } else {
+        winner = "Computador";
+        this.computerRoundWins++;
+      }
     }
+
+    // Remover as cartas da mesa após cada mão
+    setTimeout(() => {
+      playerCard.destroy(); // Remover a carta do jogador
+      computerCard.destroy(); // Remover a carta do computador
+    }, 1000);
 
     // Incrementa a rodada
     this.currentRound++;
@@ -155,10 +167,6 @@ class GameScene extends Phaser.Scene {
     if (this.currentRound === 3) {
       this.determineMatchWinner();
     }
-  }
-
-  isManilha(card) {
-    return card && card.value === this.manilha;
   }
 
   determineMatchWinner() {
@@ -171,8 +179,7 @@ class GameScene extends Phaser.Scene {
       winner = "Computador";
       this.computerPoints++;
     } else {
-      winner = "Empate";
-      // Em caso de empate nas três rodadas, ganha quem venceu a primeira rodada (se houve um vencedor)
+      // Se houver empate, quem venceu a primeira mão ganha
       if (this.playerRoundWins > 0) {
         winner = "Jogador";
         this.playerPoints++;
@@ -206,6 +213,11 @@ class GameScene extends Phaser.Scene {
     this.distributeCards();
     this.displayPlayerHand(this);
     this.displayOpponentHand(this);
+
+    // Sorteia uma nova manilha
+    this.vira = this.deck.pop();
+    this.showVira(this.vira);
+    this.manilha = this.calculateManilha(this.vira);
   }
 
   endGame(winner) {
